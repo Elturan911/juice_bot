@@ -20,6 +20,7 @@ def main() -> None:
         delete_handler,
         help_handler,
         month_handler,
+        setmarketprice_handler,
         setprice_handler,
         sheet_handler,
         start_handler,
@@ -33,6 +34,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start_handler))
     app.add_handler(CommandHandler("help", help_handler))
     app.add_handler(CommandHandler("setprice", setprice_handler))
+    app.add_handler(CommandHandler("setmarketprice", setmarketprice_handler))
     app.add_handler(CommandHandler("day", day_handler))
     app.add_handler(CommandHandler("week", week_handler))
     app.add_handler(CommandHandler("month", month_handler))

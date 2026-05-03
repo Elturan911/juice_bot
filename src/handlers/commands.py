@@ -47,14 +47,15 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(
         "🍹 juice_bot — учёт компота\n\n"
         "Пиши в свободной форме или используй команды:\n\n"
-        "/setprice <сумма> — цена бутылки\n"
-        "/day [дата]       — отчёт за день\n"
-        "/week [дата]      — отчёт за неделю\n"
-        "/month [месяц]    — отчёт за месяц\n"
-        "/cost             — последняя себестоимость\n"
-        "/sheet            — ссылка на таблицу\n"
-        "/delete <дата>    — удалить записи за дату\n"
-        "/help             — эта справка"
+        "/setprice <сумма>       — цена продажи бутылки\n"
+        "/setmarketprice <сумма> — рыночная цена в Бишкеке\n"
+        "/day [дата]             — отчёт за день\n"
+        "/week [дата]            — отчёт за неделю\n"
+        "/month [месяц]          — отчёт за месяц\n"
+        "/cost                   — последняя себестоимость\n"
+        "/sheet                  — ссылка на таблицу\n"
+        "/delete <дата>          — удалить записи за дату\n"
+        "/help                   — эта справка"
     )
 
 
@@ -156,6 +157,35 @@ async def cost_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         f"🌐 Рыночная цена: ~{float(batch.market_price_used_som or 0):,.0f} сом\n"
         f"💡 Рекомендуемая цена: {float(batch.recommended_price_som or 0):,.0f} сом\n"
         f"📈 Маржа: {margin:,.2f} сом (+{pct:.0f}%)"
+    )
+
+
+async def setmarketprice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    args = context.args
+    if not args:
+        with Session() as session:
+            from src.services.market_price import get_or_fetch_market_price
+            current = get_or_fetch_market_price(session)
+        await update.message.reply_text(
+            f"📊 Текущая рыночная цена: {current:,.0f} сом/бутылка\n"
+            "Чтобы изменить: /setmarketprice 120"
+        )
+        return
+    try:
+        price = float(args[0].replace(",", "."))
+        if price <= 0:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("❌ Укажи цену числом: /setmarketprice 120")
+        return
+
+    with Session() as session:
+        from src.services.market_price import set_market_price
+        set_market_price(session, price)
+
+    await update.message.reply_text(
+        f"✅ Рыночная цена обновлена: {price:,.0f} сом/бутылка\n"
+        "Используется для расчёта рекомендованной цены."
     )
 
 

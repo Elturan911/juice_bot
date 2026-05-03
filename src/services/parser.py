@@ -1,46 +1,86 @@
+import logging
 import os
 
-import anthropic
+from groq import Groq
 
-from src.services.schemas import EventType, IngredientUsageItem, MarketPriceResult, ParsedMessage
+from src.services.schemas import ParsedMessage
 
-MODEL_PARSE = "claude-haiku-4-5-20251001"
+logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """Ты — помощник для учёта продаж компота в офисе банка.
-Твоя задача: распознать тип события из сообщения пользователя на русском языке и извлечь данные.
+MODEL = "llama-3.3-70b-versatile"
 
-ТИПЫ СОБЫТИЙ:
-- placement: размещение бутылок на этаже
-- sale: продажа бутылок
-- expiry_removal: снятие просроченных бутылок
-- manual_count: ручная сверка остатка («осталось X бутылок»)
-- production_expense: общие расходы БЕЗ указания количества ингредиента
-- ingredient_purchase: закупка ингредиента — ТОЛЬКО если указаны И количество в единицах И цена
-- batch_usage: расход ингредиентов на партию компота
-- unknown: сообщение не относится ни к одному типу
+SYSTEM_PROMPT = """Ты — помощник для учёта продаж натурального компота в офисе банка.
+Твоя задача: распознать тип события из сообщения на русском языке и вернуть ТОЛЬКО валидный JSON.
+Никакого дополнительного текста — ТОЛЬКО JSON.
+
+ОБЯЗАТЕЛЬНАЯ СТРУКТУРА JSON (все поля обязательны, неиспользуемые = null):
+{
+  "event_type": "<тип из списка ниже>",
+  "floor": null,
+  "quantity": null,
+  "bottle_volume_ml": null,
+  "amount_som": null,
+  "description": null,
+  "event_date": null,
+  "additional_events": null,
+  "ingredient_name": null,
+  "ingredient_quantity": null,
+  "ingredient_unit": null,
+  "ingredient_total_price_som": null,
+  "batch_usages": null,
+  "batch_volume_liters": null
+}
+
+ТИПЫ event_type:
+- "placement" — размещение бутылок на этаже
+- "sale" — продажа бутылок
+- "expiry_removal" — снятие просроченных бутылок
+- "manual_count" — «осталось X бутылок» (ручная сверка)
+- "production_expense" — расходы БЕЗ единиц измерения (потратил 2000 сом на сахар)
+- "ingredient_purchase" — закупка С количеством В ЕДИНИЦАХ (кг/г/л/мл) И ценой
+- "batch_usage" — расход ингредиентов на варку партии
+- "unknown" — непонятное сообщение
 
 ПРАВИЛО ingredient_purchase vs production_expense:
-- «купил сахар 2 кг за 200 сом» → ingredient_purchase
-- «потратил 2000 сом на сахар» → production_expense (нет единиц измерения)
+- «купил сахар 2 кг за 200 сом» → ingredient_purchase (есть кг И цена)
+- «потратил 2000 сом на сахар» → production_expense (нет кг/г/л/мл)
 
 ПРИМЕРЫ:
-1. «Разместил 15 бутылок на 2ом этаже» → placement, floor=2, quantity=15
-2. «Продал 10 на 2ом и 5 на 3ем» → sale floor=2 qty=10 + additional_events: sale floor=3 qty=5
-3. «Забрал просрочку 5 бутылок с 3го этажа» → expiry_removal, floor=3, quantity=5
-4. «Потратил 2000 сом на сахар и фрукты» → production_expense, amount_som=2000
-5. «Купил сахар 2 кг за 200 сом» → ingredient_purchase, name=сахар, qty=2, unit=kg, price=200
-6. «На партию ушло 500г сахара и 2кг яблок, сварил 10 л» → batch_usage
+Вход: «Разместил 15 бутылок на 2ом этаже»
+JSON: {"event_type":"placement","floor":2,"quantity":15,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":null,"ingredient_name":null,"ingredient_quantity":null,"ingredient_unit":null,"ingredient_total_price_som":null,"batch_usages":null,"batch_volume_liters":null}
 
-Если дата не указана — оставь event_date=null."""
+Вход: «Продал 10 на 2ом и 5 на 3ем»
+JSON: {"event_type":"sale","floor":2,"quantity":10,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":[{"event_type":"sale","floor":3,"quantity":5,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":null,"ingredient_name":null,"ingredient_quantity":null,"ingredient_unit":null,"ingredient_total_price_som":null,"batch_usages":null,"batch_volume_liters":null}],"ingredient_name":null,"ingredient_quantity":null,"ingredient_unit":null,"ingredient_total_price_som":null,"batch_usages":null,"batch_volume_liters":null}
+
+Вход: «Потратил 2000 сом на сахар и фрукты»
+JSON: {"event_type":"production_expense","floor":null,"quantity":null,"bottle_volume_ml":null,"amount_som":2000,"description":"сахар и фрукты","event_date":null,"additional_events":null,"ingredient_name":null,"ingredient_quantity":null,"ingredient_unit":null,"ingredient_total_price_som":null,"batch_usages":null,"batch_volume_liters":null}
+
+Вход: «Купил сахар 2 кг за 200 сом»
+JSON: {"event_type":"ingredient_purchase","floor":null,"quantity":null,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":null,"ingredient_name":"сахар","ingredient_quantity":2,"ingredient_unit":"kg","ingredient_total_price_som":200,"batch_usages":null,"batch_volume_liters":null}
+
+Вход: «На партию ушло 500г сахара и 2кг яблок, сварил 10 литров»
+JSON: {"event_type":"batch_usage","floor":null,"quantity":null,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":null,"ingredient_name":null,"ingredient_quantity":null,"ingredient_unit":null,"ingredient_total_price_som":null,"batch_usages":[{"ingredient_name":"сахар","quantity":500,"unit":"g"},{"ingredient_name":"яблоки","quantity":2,"unit":"kg"}],"batch_volume_liters":10}
+
+Вход: «ок хорошо»
+JSON: {"event_type":"unknown","floor":null,"quantity":null,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":null,"ingredient_name":null,"ingredient_quantity":null,"ingredient_unit":null,"ingredient_total_price_som":null,"batch_usages":null,"batch_volume_liters":null}"""
 
 
 def parse_message(text: str) -> ParsedMessage:
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    result = client.messages.parse(
-        model=MODEL_PARSE,
+    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": text},
+        ],
+        response_format={"type": "json_object"},
         max_tokens=1024,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": text}],
-        output_format=ParsedMessage,
+        temperature=0.0,
     )
-    return result.parsed_output
+    json_str = response.choices[0].message.content
+    try:
+        return ParsedMessage.model_validate_json(json_str)
+    except Exception as e:
+        logger.error(f"Ошибка парсинга JSON от Groq: {e}\nJSON: {json_str}")
+        from src.services.schemas import EventType
+        return ParsedMessage(event_type=EventType.UNKNOWN)
