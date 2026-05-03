@@ -1286,6 +1286,18 @@ socks = ["httpx[socks]"]
 webhooks = ["tornado (>=6.5,<7.0)"]
 
 [[package]]
+name = "pytz"
+version = "2024.2"
+description = "World timezone definitions, modern and historical"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "pytz-2024.2-py2.py3-none-any.whl", hash = "sha256:31c7c1817eb7fae7ca4b8c7ee50c72f93aa2dd863de768e1ef4245d426aa0725"},
+    {file = "pytz-2024.2.tar.gz", hash = "sha256:2aa355083c50a0f93fa581709deac0c9ad65cca8a9e9beac660adcbd493c798a"},
+]
+
+[[package]]
 name = "requests"
 version = "2.33.1"
 description = "Python HTTP for Humans."
@@ -1515,4 +1527,4 @@ zstd = ["backports-zstd (>=1.0.0) ; python_version < \"3.14\""]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "12fb4f6968d405335f2f1a0ae23343088ac50a4b6a2099d56d3a6151c8c43937"
+content-hash = "5eb5f42508c6f261e289b121f5c1bce4099bb0639705ba113b67f7218f10666d"

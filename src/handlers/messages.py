@@ -68,6 +68,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
 
         with Session() as session:
+            # Сохраняем chat_id для ежедневного отчёта
+            if not get_setting(session, "chat_id"):
+                set_setting(session, "chat_id", str(update.effective_chat.id))
+
             # --- Проверка pending состояний ---
             pending_action = get_setting(session, "pending_action")
             if pending_action and _is_number(text):

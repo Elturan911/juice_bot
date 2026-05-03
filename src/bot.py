@@ -44,6 +44,9 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
 
+    from src.services.scheduler import DAILY_REPORT_TIME, daily_report_job
+    app.job_queue.run_daily(daily_report_job, time=DAILY_REPORT_TIME)
+
     logger.info("Бот запущен")
     app.run_polling()
 

@@ -32,6 +32,8 @@ EVENT_TYPE_RU = {
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     from src.handlers.keyboards import MAIN_KEYBOARD
+    with Session() as session:
+        set_setting(session, "chat_id", str(update.effective_chat.id))
     await update.message.reply_text(
         "Привет! Я помогу вести учёт продаж компота 🍹\n\n"
         "Пиши в свободной форме:\n"
