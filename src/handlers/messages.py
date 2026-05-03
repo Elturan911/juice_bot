@@ -1,5 +1,7 @@
+import io
 import json
 import logging
+import os
 from datetime import date
 
 from telegram import Update
@@ -489,3 +491,49 @@ async def _handle_button(update: Update, context, text: str):
             "/delete 2026-05-04 — удалить записи за дату",
             reply_markup=MAIN_KEYBOARD,
         )
+
+
+async def transcribe_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str | None:
+    """Скачивает голосовое сообщение и транскрибирует через Groq Whisper."""
+    from groq import Groq
+    try:
+        voice = update.message.voice or update.message.audio
+        tg_file = await context.bot.get_file(voice.file_id)
+        buf = io.BytesIO()
+        await tg_file.download_to_memory(buf)
+        buf.seek(0)
+
+        client = Groq(api_key=os.environ["GROQ_API_KEY"])
+        result = client.audio.transcriptions.create(
+            file=("voice.ogg", buf.read()),
+            model="whisper-large-v3-turbo",
+            language="ru",
+            response_format="text",
+        )
+        return result.strip() if isinstance(result, str) else result.text.strip()
+    except Exception as e:
+        logger.error(f"Whisper transcription error: {e}", exc_info=True)
+        return None
+
+
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик голосовых и аудио сообщений."""
+    try:
+        await update.message.reply_text("🎤 Слушаю...")
+        text = await transcribe_voice(update, context)
+
+        if not text:
+            await update.message.reply_text(
+                "😔 Не удалось распознать голосовое. Попробуй ещё раз или напиши текстом."
+            )
+            return
+
+        await update.message.reply_text(f"🎤 Распознал: «{text}»")
+
+        # Создаём синтетический Update с текстом и передаём в handle_message
+        update.message.text = text
+        await handle_message(update, context)
+
+    except Exception as e:
+        logger.error(f"handle_voice error: {e}", exc_info=True)
+        await update.message.reply_text("😔 Что-то пошло не так с голосовым сообщением.")

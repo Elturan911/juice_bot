@@ -26,7 +26,7 @@ def main() -> None:
         start_handler,
         week_handler,
     )
-    from src.handlers.messages import handle_message
+    from src.handlers.messages import handle_message, handle_voice
 
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     app = Application.builder().token(token).build()
@@ -42,6 +42,7 @@ def main() -> None:
     app.add_handler(CommandHandler("sheet", sheet_handler))
     app.add_handler(CommandHandler("delete", delete_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
 
     logger.info("Бот запущен")
     app.run_polling()
