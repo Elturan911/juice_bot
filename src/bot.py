@@ -2,7 +2,7 @@ import logging
 import os
 
 from dotenv import load_dotenv
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, JobQueue, MessageHandler, filters
 
 load_dotenv()
 
@@ -29,7 +29,7 @@ def main() -> None:
     from src.handlers.messages import handle_message, handle_voice
 
     token = os.environ["TELEGRAM_BOT_TOKEN"]
-    app = Application.builder().token(token).build()
+    app = Application.builder().token(token).job_queue(JobQueue()).build()
 
     app.add_handler(CommandHandler("start", start_handler))
     app.add_handler(CommandHandler("help", help_handler))
