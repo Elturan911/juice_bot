@@ -5,6 +5,19 @@ from datetime import date
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from src.handlers.keyboards import (
+    ALL_BUTTONS,
+    BTN_COST,
+    BTN_HELP,
+    BTN_MARKET_PRICE,
+    BTN_MONTH,
+    BTN_SET_PRICE,
+    BTN_SHEET,
+    BTN_TODAY,
+    BTN_WEEK,
+    MAIN_KEYBOARD,
+)
+
 from src.models.base import Session
 from src.models.batch import save_batch
 from src.models.batch_usage import BatchIngredientUsage
@@ -47,8 +60,18 @@ EVENT_TYPE_LABELS = {
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (update.message.text or "").strip()
     try:
+        # --- Роутинг кнопок главного меню ---
+        if text in ALL_BUTTONS:
+            await _handle_button(update, context, text)
+            return
+
         with Session() as session:
             # --- Проверка pending состояний ---
+            pending_action = get_setting(session, "pending_action")
+            if pending_action and _is_number(text):
+                await _handle_pending_action(update, session, pending_action, text)
+                return
+
             pending_batch = get_setting(session, "pending_batch_text")
             pending_delete = get_setting(session, "pending_delete_ids")
 
@@ -341,3 +364,128 @@ def _is_selection(text: str) -> bool:
         return True
     parts = text.replace(",", " ").split()
     return all(p.isdigit() for p in parts) and len(parts) > 0
+
+
+def _is_number(text: str) -> bool:
+    try:
+        float(text.replace(",", ".").strip())
+        return True
+    except ValueError:
+        return False
+
+
+async def _handle_pending_action(update, session, action: str, text: str):
+    try:
+        value = float(text.replace(",", ".").strip())
+    except ValueError:
+        await update.message.reply_text("❌ Введи число, например: 100")
+        return
+
+    delete_setting(session, "pending_action")
+
+    if action == "setprice":
+        set_setting(session, "bottle_price", str(value))
+        await update.message.reply_text(
+            f"✅ Цена продажи: {value:,.0f} сом/бутылка",
+            reply_markup=MAIN_KEYBOARD,
+        )
+    elif action == "setmarketprice":
+        from src.services.market_price import set_market_price
+        set_market_price(session, value)
+        await update.message.reply_text(
+            f"✅ Рыночная цена: {value:,.0f} сом/бутылка",
+            reply_markup=MAIN_KEYBOARD,
+        )
+
+
+async def _handle_button(update: Update, context, text: str):
+    from src.handlers.commands import (
+        cost_handler, month_handler, sheet_handler, week_handler,
+    )
+
+    if text == BTN_TODAY:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id, text="/day"
+        )
+        # Имитируем вызов /day
+        from src.models.base import Session as Sess
+        from src.services.analytics import format_period_report, get_day_analytics
+        with Sess() as session:
+            analytics = get_day_analytics(session, date.today())
+        import calendar
+        d = date.today()
+        label = f"Отчёт за {d.day} {calendar.month_name[d.month].lower()} {d.year}"
+        await update.message.reply_text(
+            format_period_report(analytics, label),
+            reply_markup=MAIN_KEYBOARD,
+        )
+
+    elif text == BTN_WEEK:
+        from src.models.base import Session as Sess
+        from src.services.analytics import format_period_report, get_week_analytics
+        with Sess() as session:
+            analytics = get_week_analytics(session, date.today())
+        if analytics:
+            start, end = analytics["start"], analytics["end"]
+            label = f"Неделя {start.strftime('%d.%m')} — {end.strftime('%d.%m.%Y')}"
+        else:
+            label = "текущая неделя"
+        await update.message.reply_text(
+            format_period_report(analytics, label),
+            reply_markup=MAIN_KEYBOARD,
+        )
+
+    elif text == BTN_MONTH:
+        from src.models.base import Session as Sess
+        from src.services.analytics import format_period_report, get_month_analytics
+        import calendar
+        d = date.today()
+        with Sess() as session:
+            analytics = get_month_analytics(session, d.year, d.month)
+        label = f"{calendar.month_name[d.month]} {d.year}"
+        await update.message.reply_text(
+            format_period_report(analytics, label),
+            reply_markup=MAIN_KEYBOARD,
+        )
+
+    elif text == BTN_COST:
+        await cost_handler(update, context)
+
+    elif text == BTN_SHEET:
+        await sheet_handler(update, context)
+
+    elif text == BTN_SET_PRICE:
+        with Session() as session:
+            current = get_setting(session, "bottle_price")
+            set_setting(session, "pending_action", "setprice")
+        current_str = f" (сейчас: {float(current):,.0f} сом)" if current else ""
+        await update.message.reply_text(
+            f"💰 Введи новую цену продажи бутылки{current_str}:\n"
+            "Просто напиши число, например: 100"
+        )
+
+    elif text == BTN_MARKET_PRICE:
+        with Session() as session:
+            from src.services.market_price import get_or_fetch_market_price
+            current = get_or_fetch_market_price(session)
+            set_setting(session, "pending_action", "setmarketprice")
+        await update.message.reply_text(
+            f"🌐 Введи рыночную цену компота в Бишкеке\n"
+            f"(сейчас: {current:,.0f} сом за 0.5 л):\n"
+            "Просто напиши число, например: 120"
+        )
+
+    elif text == BTN_HELP:
+        await update.message.reply_text(
+            "🍹 juice_bot — учёт компота\n\n"
+            "Пиши в свободной форме:\n"
+            "• «продал 10 бутылок на 2ом этаже»\n"
+            "• «разместил 15 бутылок на 3ем этаже»\n"
+            "• «купил сахар 2 кг за 200 сом»\n"
+            "• «потратил 500 сом на электричество»\n"
+            "• «на партию ушло 500г сахара, сварил 10 л»\n\n"
+            "Или используй кнопки меню ниже 👇\n\n"
+            "Команды для удаления:\n"
+            "/delete 2026-05-04 — удалить записи за дату",
+            reply_markup=MAIN_KEYBOARD,
+        )

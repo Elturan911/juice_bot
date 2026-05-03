@@ -31,15 +31,16 @@ EVENT_TYPE_RU = {
 
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from src.handlers.keyboards import MAIN_KEYBOARD
     await update.message.reply_text(
         "Привет! Я помогу вести учёт продаж компота 🍹\n\n"
-        "Просто пиши мне что происходит:\n"
+        "Пиши в свободной форме:\n"
         "• «продал 10 бутылок на 2ом этаже»\n"
         "• «разместил 15 бутылок на 3ем этаже»\n"
-        "• «купил сахар 2 кг за 200 сом»\n"
-        "• «на партию ушло 500 г сахара, сварил 10 литров»\n\n"
-        "Сначала установи цену бутылки: /setprice 100\n\n"
-        "Все команды: /help"
+        "• «купил сахар 2 кг за 200 сом»\n\n"
+        "Или используй кнопки меню ниже 👇\n\n"
+        "Сначала нажми 💰 Цена продажи и введи цену.",
+        reply_markup=MAIN_KEYBOARD,
     )
 
 
