@@ -6,7 +6,7 @@ from telegram.ext import ContextTypes
 
 from src.models.base import Session
 from src.models.settings import get_setting, set_setting
-from src.services.analytics import format_period_report, get_day_analytics
+from src.services.analytics import format_period_report, get_day_analytics, get_prev_day_analytics
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +23,11 @@ async def daily_report_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
         today = date.today()
         analytics = get_day_analytics(session, today)
+        prev = get_prev_day_analytics(session, today)
 
     if analytics:
         label = f"📅 Итоги дня — {today.strftime('%d.%m.%Y')}"
-        text = format_period_report(analytics, label)
+        text = format_period_report(analytics, label, prev or None)
         text += "\n\n_Автоотчёт в 22:00_ 🕙"
     else:
         text = (

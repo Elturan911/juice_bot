@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.models.batch import Batch
@@ -12,10 +12,22 @@ def get_day_analytics(session: Session, target_date: date) -> dict:
     return _get_period_analytics(session, target_date, target_date)
 
 
+def get_prev_day_analytics(session: Session, target_date: date) -> dict:
+    prev = target_date - timedelta(days=1)
+    return _get_period_analytics(session, prev, prev)
+
+
 def get_week_analytics(session: Session, any_date: date) -> dict:
     monday = any_date - timedelta(days=any_date.weekday())
     sunday = monday + timedelta(days=6)
     return _get_period_analytics(session, monday, sunday)
+
+
+def get_prev_week_analytics(session: Session, any_date: date) -> dict:
+    monday = any_date - timedelta(days=any_date.weekday())
+    prev_monday = monday - timedelta(weeks=1)
+    prev_sunday = prev_monday + timedelta(days=6)
+    return _get_period_analytics(session, prev_monday, prev_sunday)
 
 
 def get_month_analytics(session: Session, year: int, month: int) -> dict:
@@ -23,6 +35,18 @@ def get_month_analytics(session: Session, year: int, month: int) -> dict:
     last_day = monthrange(year, month)[1]
     start = date(year, month, 1)
     end = date(year, month, last_day)
+    return _get_period_analytics(session, start, end)
+
+
+def get_prev_month_analytics(session: Session, year: int, month: int) -> dict:
+    from calendar import monthrange
+    if month == 1:
+        prev_year, prev_month = year - 1, 12
+    else:
+        prev_year, prev_month = year, month - 1
+    last_day = monthrange(prev_year, prev_month)[1]
+    start = date(prev_year, prev_month, 1)
+    end = date(prev_year, prev_month, last_day)
     return _get_period_analytics(session, start, end)
 
 
@@ -70,14 +94,29 @@ def _get_period_analytics(session: Session, start: date, end: date) -> dict:
     }
 
 
-def format_period_report(analytics: dict, label: str) -> str:
+def _delta(current: float, previous: float) -> str:
+    if previous == 0:
+        return ""
+    pct = (current - previous) / previous * 100
+    arrow = "▲" if pct >= 0 else "▼"
+    return f" {arrow}{abs(pct):.0f}%"
+
+
+def format_period_report(analytics: dict, label: str, prev: dict | None = None) -> str:
     if not analytics:
-        return f"📭 За период нет записей."
+        return "📭 За период нет записей."
 
     lines = [f"📊 {label}\n"]
-    lines.append(f"💰 Выручка:    {analytics['revenue']:,.0f} сом")
-    lines.append(f"📉 Расходы:    {analytics['expenses']:,.0f} сом")
-    lines.append(f"✅ Прибыль:   {analytics['profit']:,.0f} сом")
+
+    rev_delta = _delta(analytics["revenue"], prev["revenue"]) if prev else ""
+    exp_delta = _delta(analytics["expenses"], prev["expenses"]) if prev else ""
+    prf_delta = _delta(analytics["profit"], prev["profit"]) if prev else ""
+    sol_delta = _delta(analytics["sold"], prev["sold"]) if prev else ""
+
+    lines.append(f"💰 Выручка:   {analytics['revenue']:,.0f} сом{rev_delta}")
+    lines.append(f"📉 Расходы:   {analytics['expenses']:,.0f} сом{exp_delta}")
+    lines.append(f"✅ Прибыль:  {analytics['profit']:,.0f} сом{prf_delta}")
+    lines.append(f"🍾 Продано:  {analytics['sold']} шт{sol_delta}")
 
     if analytics["sales_by_floor"]:
         lines.append("\nПо этажам:")
@@ -86,7 +125,11 @@ def format_period_report(analytics: dict, label: str) -> str:
             floor_rev = qty * analytics["bottle_price"]
             lines.append(f"  🏢 {floor_label} этаж: {qty} шт → {floor_rev:,.0f} сом")
 
-    lines.append(f"\n🍾 Размещено: {analytics['placed']} шт  |  🗑 Просрочка: {analytics['expiry']} шт")
+    lines.append(f"\n📦 Размещено: {analytics['placed']} шт  |  🗑 Просрочка: {analytics['expiry']} шт")
+
+    if prev:
+        lines.append(f"\n(▲▼ vs предыдущий период)")
+
     return "\n".join(lines)
 
 

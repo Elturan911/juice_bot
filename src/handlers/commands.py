@@ -14,6 +14,9 @@ from src.services.analytics import (
     get_day_analytics,
     get_events_for_date,
     get_month_analytics,
+    get_prev_day_analytics,
+    get_prev_month_analytics,
+    get_prev_week_analytics,
     get_week_analytics,
 )
 
@@ -92,9 +95,10 @@ async def day_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     with Session() as session:
         analytics = get_day_analytics(session, target)
+        prev = get_prev_day_analytics(session, target)
 
     label = f"Отчёт за {target.strftime('%d %B %Y').lower()}"
-    await update.message.reply_text(format_period_report(analytics, label))
+    await update.message.reply_text(format_period_report(analytics, label, prev or None))
 
 
 async def week_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -105,6 +109,7 @@ async def week_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     with Session() as session:
         analytics = get_week_analytics(session, target)
+        prev = get_prev_week_analytics(session, target)
 
     if analytics:
         start = analytics["start"]
@@ -112,7 +117,7 @@ async def week_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         label = f"Неделя {start.strftime('%d.%m')} — {end.strftime('%d.%m.%Y')}"
     else:
         label = "неделя"
-    await update.message.reply_text(format_period_report(analytics, label))
+    await update.message.reply_text(format_period_report(analytics, label, prev or None))
 
 
 async def month_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -130,11 +135,12 @@ async def month_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     with Session() as session:
         analytics = get_month_analytics(session, year, month)
+        prev = get_prev_month_analytics(session, year, month)
 
     import calendar
     month_name = calendar.month_name[month]
     label = f"{month_name} {year}"
-    await update.message.reply_text(format_period_report(analytics, label))
+    await update.message.reply_text(format_period_report(analytics, label, prev or None))
 
 
 async def cost_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
