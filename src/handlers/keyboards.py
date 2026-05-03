@@ -7,12 +7,13 @@ BTN_COST = "💸 Себестоимость"
 BTN_SHEET = "📋 Таблица"
 BTN_SET_PRICE = "💰 Цена продажи"
 BTN_MARKET_PRICE = "🌐 Рыночная цена"
+BTN_STOCK = "📦 Остатки"
 BTN_HELP = "❓ Помощь"
 
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
         [BTN_TODAY, BTN_WEEK, BTN_MONTH],
-        [BTN_COST, BTN_SHEET],
+        [BTN_STOCK, BTN_COST, BTN_SHEET],
         [BTN_SET_PRICE, BTN_MARKET_PRICE],
         [BTN_HELP],
     ],
@@ -21,4 +22,4 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
 )
 
 ALL_BUTTONS = {BTN_TODAY, BTN_WEEK, BTN_MONTH, BTN_COST,
-               BTN_SHEET, BTN_SET_PRICE, BTN_MARKET_PRICE, BTN_HELP}
+               BTN_SHEET, BTN_SET_PRICE, BTN_MARKET_PRICE, BTN_HELP, BTN_STOCK}

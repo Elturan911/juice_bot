@@ -15,6 +15,7 @@ from src.handlers.keyboards import (
     BTN_MONTH,
     BTN_SET_PRICE,
     BTN_SHEET,
+    BTN_STOCK,
     BTN_TODAY,
     BTN_WEEK,
     MAIN_KEYBOARD,
@@ -452,6 +453,14 @@ async def _handle_button(update: Update, context, text: str):
         await update.message.reply_text(
             format_period_report(analytics, label),
             reply_markup=MAIN_KEYBOARD,
+        )
+
+    elif text == BTN_STOCK:
+        from src.services.stock import format_stock_report, get_floor_stock
+        with Session() as session:
+            stock = get_floor_stock(session)
+        await update.message.reply_text(
+            format_stock_report(stock), reply_markup=MAIN_KEYBOARD
         )
 
     elif text == BTN_COST:

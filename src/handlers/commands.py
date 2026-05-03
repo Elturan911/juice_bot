@@ -163,6 +163,13 @@ async def cost_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
 
+async def stock_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from src.services.stock import format_stock_report, get_floor_stock
+    with Session() as session:
+        stock = get_floor_stock(session)
+    await update.message.reply_text(format_stock_report(stock))
+
+
 async def setmarketprice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     args = context.args
     if not args:

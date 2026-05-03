@@ -24,6 +24,7 @@ def main() -> None:
         setprice_handler,
         sheet_handler,
         start_handler,
+        stock_handler,
         week_handler,
     )
     from src.handlers.messages import handle_message, handle_voice
@@ -41,6 +42,7 @@ def main() -> None:
     app.add_handler(CommandHandler("cost", cost_handler))
     app.add_handler(CommandHandler("sheet", sheet_handler))
     app.add_handler(CommandHandler("delete", delete_handler))
+    app.add_handler(CommandHandler("stock", stock_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
 
