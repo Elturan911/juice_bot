@@ -133,6 +133,52 @@ def format_period_report(analytics: dict, label: str, prev: dict | None = None) 
     return "\n".join(lines)
 
 
+def get_breakeven_analysis(session: Session) -> dict:
+    from calendar import monthrange
+    today = date.today()
+    year, month = today.year, today.month
+    days_in_month = monthrange(year, month)[1]
+    days_passed = today.day
+    days_left = days_in_month - days_passed
+
+    month_data = get_month_analytics(session, year, month)
+    expenses = month_data.get("expenses", 0.0) if month_data else 0.0
+    sold = month_data.get("sold", 0) if month_data else 0
+    revenue = month_data.get("revenue", 0.0) if month_data else 0.0
+
+    bottle_price_str = get_setting(session, "bottle_price")
+    bottle_price = float(bottle_price_str) if bottle_price_str else 0.0
+
+    cost_per_bottle = get_latest_batch_cost_per_bottle(session) or 0.0
+    margin_per_bottle = bottle_price - cost_per_bottle
+
+    breakeven_bottles = int(expenses / margin_per_bottle) + 1 if margin_per_bottle > 0 else None
+    bottles_to_go = max(0, (breakeven_bottles or 0) - sold) if breakeven_bottles else None
+    daily_pace = sold / days_passed if days_passed > 0 else 0
+    projected_month = int(daily_pace * days_in_month)
+    projected_revenue = projected_month * bottle_price
+    projected_profit = projected_revenue - expenses
+
+    return {
+        "today": today,
+        "days_passed": days_passed,
+        "days_left": days_left,
+        "days_in_month": days_in_month,
+        "expenses": expenses,
+        "sold": sold,
+        "revenue": revenue,
+        "bottle_price": bottle_price,
+        "cost_per_bottle": cost_per_bottle,
+        "margin_per_bottle": margin_per_bottle,
+        "breakeven_bottles": breakeven_bottles,
+        "bottles_to_go": bottles_to_go,
+        "daily_pace": daily_pace,
+        "projected_month": projected_month,
+        "projected_revenue": projected_revenue,
+        "projected_profit": projected_profit,
+    }
+
+
 def get_events_for_date(session: Session, target_date: date) -> list[Event]:
     return list(
         session.scalars(select(Event).where(Event.event_date == target_date)).all()

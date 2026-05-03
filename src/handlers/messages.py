@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes
 
 from src.handlers.keyboards import (
     ALL_BUTTONS,
+    BTN_BREAKEVEN,
     BTN_COST,
     BTN_HELP,
     BTN_MARKET_PRICE,
@@ -411,47 +412,52 @@ async def _handle_button(update: Update, context, text: str):
     )
 
     if text == BTN_TODAY:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id, text="/day"
-        )
-        # Имитируем вызов /day
         from src.models.base import Session as Sess
-        from src.services.analytics import format_period_report, get_day_analytics
-        with Sess() as session:
-            analytics = get_day_analytics(session, date.today())
+        from src.services.analytics import (
+            format_period_report, get_day_analytics, get_prev_day_analytics,
+        )
         import calendar
         d = date.today()
+        with Sess() as session:
+            analytics = get_day_analytics(session, d)
+            prev = get_prev_day_analytics(session, d)
         label = f"Отчёт за {d.day} {calendar.month_name[d.month].lower()} {d.year}"
         await update.message.reply_text(
-            format_period_report(analytics, label),
+            format_period_report(analytics, label, prev or None),
             reply_markup=MAIN_KEYBOARD,
         )
 
     elif text == BTN_WEEK:
         from src.models.base import Session as Sess
-        from src.services.analytics import format_period_report, get_week_analytics
+        from src.services.analytics import (
+            format_period_report, get_week_analytics, get_prev_week_analytics,
+        )
         with Sess() as session:
             analytics = get_week_analytics(session, date.today())
+            prev = get_prev_week_analytics(session, date.today())
         if analytics:
             start, end = analytics["start"], analytics["end"]
             label = f"Неделя {start.strftime('%d.%m')} — {end.strftime('%d.%m.%Y')}"
         else:
             label = "текущая неделя"
         await update.message.reply_text(
-            format_period_report(analytics, label),
+            format_period_report(analytics, label, prev or None),
             reply_markup=MAIN_KEYBOARD,
         )
 
     elif text == BTN_MONTH:
         from src.models.base import Session as Sess
-        from src.services.analytics import format_period_report, get_month_analytics
+        from src.services.analytics import (
+            format_period_report, get_month_analytics, get_prev_month_analytics,
+        )
         import calendar
         d = date.today()
         with Sess() as session:
             analytics = get_month_analytics(session, d.year, d.month)
+            prev = get_prev_month_analytics(session, d.year, d.month)
         label = f"{calendar.month_name[d.month]} {d.year}"
         await update.message.reply_text(
-            format_period_report(analytics, label),
+            format_period_report(analytics, label, prev or None),
             reply_markup=MAIN_KEYBOARD,
         )
 
@@ -462,6 +468,10 @@ async def _handle_button(update: Update, context, text: str):
         await update.message.reply_text(
             format_stock_report(stock), reply_markup=MAIN_KEYBOARD
         )
+
+    elif text == BTN_BREAKEVEN:
+        from src.handlers.commands import breakeven_handler
+        await breakeven_handler(update, context)
 
     elif text == BTN_COST:
         await cost_handler(update, context)

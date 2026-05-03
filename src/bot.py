@@ -28,6 +28,7 @@ def _is_admin(update) -> bool:
 
 def main() -> None:
     from src.handlers.commands import (
+        breakeven_handler,
         cost_handler,
         day_handler,
         delete_handler,
@@ -79,6 +80,7 @@ def main() -> None:
     app.add_handler(CommandHandler("sheet", sheet_handler))
     app.add_handler(CommandHandler("delete", delete_handler))
     app.add_handler(CommandHandler("stock", stock_handler))
+    app.add_handler(CommandHandler("breakeven", breakeven_handler))
 
     # ── Текстовые сообщения: роутинг admin / customer ─────────────────────
     async def route_text(update, context):

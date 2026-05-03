@@ -11,6 +11,7 @@ from src.models.batch import Batch
 from src.models.settings import get_setting, set_setting
 from src.services.analytics import (
     format_period_report,
+    get_breakeven_analysis,
     get_day_analytics,
     get_events_for_date,
     get_month_analytics,
@@ -167,6 +168,43 @@ async def cost_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         f"💡 Рекомендуемая цена: {float(batch.recommended_price_som or 0):,.0f} сом\n"
         f"📈 Маржа: {margin:,.2f} сом (+{pct:.0f}%)"
     )
+
+
+async def breakeven_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    with Session() as session:
+        d = get_breakeven_analysis(session)
+
+    if not d["bottle_price"]:
+        await update.message.reply_text("❌ Сначала установи цену продажи: /setprice 100")
+        return
+
+    lines = [f"📐 Безубыточность — {d['today'].strftime('%B %Y')}\n"]
+
+    if d["margin_per_bottle"] <= 0:
+        lines.append("⚠️ Маржа на бутылку ≤ 0. Проверь себестоимость и цену продажи.")
+    else:
+        lines.append(f"💰 Цена продажи:    {d['bottle_price']:,.0f} сом")
+        lines.append(f"🏭 Себестоимость:   {d['cost_per_bottle']:,.2f} сом")
+        lines.append(f"📈 Маржа/бутылка:   {d['margin_per_bottle']:,.2f} сом")
+        lines.append(f"📉 Расходы за месяц: {d['expenses']:,.0f} сом\n")
+
+        if d["breakeven_bottles"] is not None:
+            lines.append(f"🎯 Нужно продать: {d['breakeven_bottles']} бут/мес чтобы выйти в ноль")
+            if d["bottles_to_go"] and d["bottles_to_go"] > 0:
+                daily_needed = d["bottles_to_go"] / d["days_left"] if d["days_left"] > 0 else d["bottles_to_go"]
+                lines.append(f"⏳ Осталось продать: {d['bottles_to_go']} бут за {d['days_left']} дней")
+                lines.append(f"   (~{daily_needed:.1f} бут/день)")
+            else:
+                lines.append("✅ Точка безубыточности уже пройдена!")
+
+    lines.append(f"\n📊 Факт за {d['days_passed']} дн.: {d['sold']} бут ({d['daily_pace']:.1f} бут/день)")
+    lines.append(f"🔮 Прогноз на месяц: {d['projected_month']} бут")
+    lines.append(f"   Выручка: ~{d['projected_revenue']:,.0f} сом")
+
+    profit_sign = "+" if d["projected_profit"] >= 0 else ""
+    lines.append(f"   Прибыль: ~{profit_sign}{d['projected_profit']:,.0f} сом")
+
+    await update.message.reply_text("\n".join(lines))
 
 
 async def stock_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

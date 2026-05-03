@@ -6,6 +6,7 @@ BTN_WEEK = "📅 Неделя"
 BTN_MONTH = "🗓 Месяц"
 BTN_STOCK = "📦 Остатки"
 BTN_COST = "💸 Себестоимость"
+BTN_BREAKEVEN = "📐 Безубыточность"
 BTN_SHEET = "📋 Таблица"
 BTN_SET_PRICE = "💰 Цена продажи"
 BTN_MARKET_PRICE = "🌐 Рыночная цена"
@@ -14,8 +15,8 @@ BTN_HELP = "❓ Помощь"
 ADMIN_KEYBOARD = ReplyKeyboardMarkup(
     [
         [BTN_TODAY, BTN_WEEK, BTN_MONTH],
-        [BTN_STOCK, BTN_COST, BTN_SHEET],
-        [BTN_SET_PRICE, BTN_MARKET_PRICE],
+        [BTN_STOCK, BTN_COST, BTN_BREAKEVEN],
+        [BTN_SHEET, BTN_SET_PRICE, BTN_MARKET_PRICE],
         [BTN_HELP],
     ],
     resize_keyboard=True,
@@ -26,7 +27,7 @@ ADMIN_KEYBOARD = ReplyKeyboardMarkup(
 MAIN_KEYBOARD = ADMIN_KEYBOARD
 
 ADMIN_BUTTONS = {BTN_TODAY, BTN_WEEK, BTN_MONTH, BTN_COST,
-                 BTN_SHEET, BTN_SET_PRICE, BTN_MARKET_PRICE, BTN_HELP, BTN_STOCK}
+                 BTN_SHEET, BTN_SET_PRICE, BTN_MARKET_PRICE, BTN_HELP, BTN_STOCK, BTN_BREAKEVEN}
 ALL_BUTTONS = ADMIN_BUTTONS  # для обратной совместимости
 
 # ── Кнопки клиента ────────────────────────────────────────────────────────
