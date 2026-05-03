@@ -9,6 +9,6 @@ RUN poetry install --only main --no-interaction
 
 COPY . .
 
-ENV PYTHONPATH=/app
+WORKDIR /app
 
-CMD ["python", "src/bot.py"]
+CMD ["python", "-m", "src.bot"]
