@@ -42,8 +42,10 @@ SYSTEM_PROMPT = """Ты — помощник для учёта продаж на
 - "unknown" — непонятное сообщение
 
 ПРАВИЛО ingredient_purchase vs production_expense:
-- «купил сахар 2 кг за 200 сом» → ingredient_purchase (есть кг И цена)
-- «потратил 2000 сом на сахар» → production_expense (нет кг/г/л/мл)
+- «купил сахар 2 кг за 200 сом» → ingredient_purchase (есть количество с единицей И цена)
+- «закупил 1350 штук наклеек за 53 сом» → ingredient_purchase (штуки = pcs, есть количество И цена)
+- «потратил 2000 сом на сахар» → production_expense (нет количества с единицей)
+Единицы для ingredient_purchase: кг→kg, г→g, л→l, мл→ml, шт/штук/штуки/единиц/упаковок→pcs
 
 ПРИМЕРЫ:
 Вход: «Разместил 15 бутылок на 2ом этаже»
@@ -60,6 +62,9 @@ JSON: {"event_type":"ingredient_purchase","floor":null,"quantity":null,"bottle_v
 
 Вход: «На партию ушло 500г сахара и 2кг яблок, сварил 10 литров»
 JSON: {"event_type":"batch_usage","floor":null,"quantity":null,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":null,"ingredient_name":null,"ingredient_quantity":null,"ingredient_unit":null,"ingredient_total_price_som":null,"batch_usages":[{"ingredient_name":"сахар","quantity":500,"unit":"g"},{"ingredient_name":"яблоки","quantity":2,"unit":"kg"}],"batch_volume_liters":10}
+
+Вход: «Закупил 1350 штук наклеек на общую сумму 53,03 сом»
+JSON: {"event_type":"ingredient_purchase","floor":null,"quantity":null,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":null,"ingredient_name":"наклейки","ingredient_quantity":1350,"ingredient_unit":"pcs","ingredient_total_price_som":53.03,"batch_usages":null,"batch_volume_liters":null}
 
 Вход: «ок хорошо»
 JSON: {"event_type":"unknown","floor":null,"quantity":null,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":null,"ingredient_name":null,"ingredient_quantity":null,"ingredient_unit":null,"ingredient_total_price_som":null,"batch_usages":null,"batch_volume_liters":null}"""
