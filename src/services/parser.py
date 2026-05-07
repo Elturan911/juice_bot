@@ -41,11 +41,15 @@ SYSTEM_PROMPT = """Ты — помощник для учёта продаж на
 - "batch_usage" — расход ингредиентов на варку партии
 - "unknown" — непонятное сообщение
 
-ПРАВИЛО ingredient_purchase vs production_expense:
+ПРАВИЛО ingredient_purchase vs production_expense vs placement:
 - «купил сахар 2 кг за 200 сом» → ingredient_purchase (есть количество с единицей И цена)
 - «закупил 1350 штук наклеек за 53 сом» → ingredient_purchase (штуки = pcs, есть количество И цена)
+- «закупил 155 бутылок по 0.5л на сумму 2505 сом» → ingredient_purchase (покупка тары, есть цена)
 - «потратил 2000 сом на сахар» → production_expense (нет количества с единицей)
-Единицы для ingredient_purchase: кг→kg, г→g, л→l, мл→ml, шт/штук/штуки/единиц/упаковок→pcs
+- «разместил 15 бутылок на 2ом этаже» → placement (ключевое слово «разместил», есть этаж)
+ВАЖНО: «закупил/купил бутылки» с ценой = ingredient_purchase (покупка тары для компота).
+«разместил бутылки на этаже» = placement (выставил уже готовый компот).
+Единицы для ingredient_purchase: кг→kg, г→g, л→l, мл→ml, шт/штук/штуки/бутылок/единиц/упаковок→pcs
 
 ПРИМЕРЫ:
 Вход: «Разместил 15 бутылок на 2ом этаже»
@@ -65,6 +69,9 @@ JSON: {"event_type":"batch_usage","floor":null,"quantity":null,"bottle_volume_ml
 
 Вход: «Закупил 1350 штук наклеек на общую сумму 53,03 сом»
 JSON: {"event_type":"ingredient_purchase","floor":null,"quantity":null,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":null,"ingredient_name":"наклейки","ingredient_quantity":1350,"ingredient_unit":"pcs","ingredient_total_price_som":53.03,"batch_usages":null,"batch_volume_liters":null}
+
+Вход: «Закупил 155 бутылок по 0,5 литра на общую сумму 2505 сом»
+JSON: {"event_type":"ingredient_purchase","floor":null,"quantity":null,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":null,"ingredient_name":"бутылки 0.5л","ingredient_quantity":155,"ingredient_unit":"pcs","ingredient_total_price_som":2505,"batch_usages":null,"batch_volume_liters":null}
 
 Вход: «ок хорошо»
 JSON: {"event_type":"unknown","floor":null,"quantity":null,"bottle_volume_ml":null,"amount_som":null,"description":null,"event_date":null,"additional_events":null,"ingredient_name":null,"ingredient_quantity":null,"ingredient_unit":null,"ingredient_total_price_som":null,"batch_usages":null,"batch_volume_liters":null}"""
