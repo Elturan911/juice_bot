@@ -26,6 +26,22 @@ def _is_admin(update) -> bool:
     return update.effective_chat.id == ADMIN_CHAT_ID
 
 
+def _admin_only(handler):
+    async def wrapped(update, context):
+        if _is_admin(update):
+            await handler(update, context)
+            return
+
+        from src.handlers.keyboards import CUSTOMER_KEYBOARD
+
+        await update.message.reply_text(
+            "Здесь можно только посмотреть остатки компота по этажам.",
+            reply_markup=CUSTOMER_KEYBOARD,
+        )
+
+    return wrapped
+
+
 def main() -> None:
     from src.handlers.commands import (
         breakeven_handler,
@@ -63,24 +79,24 @@ def main() -> None:
             with Session() as session:
                 set_setting(session, f"c_registered_{update.effective_chat.id}", "1")
             await update.message.reply_text(
-                "Привет! 🍹 Здесь можно узнать остатки компота или сообщить о покупке.",
+                "Привет! 🍹 Выбери этаж, чтобы посмотреть сколько компота осталось.",
                 reply_markup=CUSTOMER_KEYBOARD,
             )
 
     app.add_handler(CommandHandler("start", smart_start))
 
     # ── Команды администратора ────────────────────────────────────────────
-    app.add_handler(CommandHandler("help", help_handler))
-    app.add_handler(CommandHandler("setprice", setprice_handler))
-    app.add_handler(CommandHandler("setmarketprice", setmarketprice_handler))
-    app.add_handler(CommandHandler("day", day_handler))
-    app.add_handler(CommandHandler("week", week_handler))
-    app.add_handler(CommandHandler("month", month_handler))
-    app.add_handler(CommandHandler("cost", cost_handler))
-    app.add_handler(CommandHandler("sheet", sheet_handler))
-    app.add_handler(CommandHandler("delete", delete_handler))
-    app.add_handler(CommandHandler("stock", stock_handler))
-    app.add_handler(CommandHandler("breakeven", breakeven_handler))
+    app.add_handler(CommandHandler("help", _admin_only(help_handler)))
+    app.add_handler(CommandHandler("setprice", _admin_only(setprice_handler)))
+    app.add_handler(CommandHandler("setmarketprice", _admin_only(setmarketprice_handler)))
+    app.add_handler(CommandHandler("day", _admin_only(day_handler)))
+    app.add_handler(CommandHandler("week", _admin_only(week_handler)))
+    app.add_handler(CommandHandler("month", _admin_only(month_handler)))
+    app.add_handler(CommandHandler("cost", _admin_only(cost_handler)))
+    app.add_handler(CommandHandler("sheet", _admin_only(sheet_handler)))
+    app.add_handler(CommandHandler("delete", _admin_only(delete_handler)))
+    app.add_handler(CommandHandler("stock", _admin_only(stock_handler)))
+    app.add_handler(CommandHandler("breakeven", _admin_only(breakeven_handler)))
 
     # ── Текстовые сообщения: роутинг admin / customer ─────────────────────
     async def route_text(update, context):
@@ -92,7 +108,18 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, route_text))
 
     # ── Голосовые: только для администратора ─────────────────────────────
-    app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
+    async def route_voice(update, context):
+        if _is_admin(update):
+            await handle_voice(update, context)
+        else:
+            from src.handlers.keyboards import CUSTOMER_KEYBOARD
+
+            await update.message.reply_text(
+                "Голосовые доступны только администратору. Выбери этаж ниже.",
+                reply_markup=CUSTOMER_KEYBOARD,
+            )
+
+    app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, route_voice))
 
     # ── Фото: клиент → чек, администратор → игнорируем (пока) ────────────
     async def route_photo(update, context):

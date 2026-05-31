@@ -1,4 +1,3 @@
-import base64
 import io
 import json
 import logging
@@ -29,15 +28,18 @@ from src.models.batch_usage import BatchIngredientUsage
 from src.models.event import delete_events_by_ids, save_events
 from src.models.ingredient import get_or_create_ingredient
 from src.models.ingredient_purchase import IngredientPurchase
-from src.models.settings import delete_setting, get_setting, set_setting
-from src.services.analytics import get_events_for_date
+from src.models.settings import (
+    delete_setting,
+    get_registered_customer_chat_ids,
+    get_setting,
+    set_setting,
+)
 from src.services.cost_calculator import calculate_batch_cost, calculate_recommended_price
 from src.services.market_price import get_or_fetch_market_price
 from src.services.parser import parse_message
 from src.services.schemas import EventType, ParsedMessage
 from src.services.sheets import (
     append_to_expenses,
-    append_to_profit,
     append_to_revenue,
 )
 from src.services.unit_converter import convert_to_base_unit, get_base_unit
@@ -118,14 +120,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     await _handle_batch_complete(update, session, parsed, text)
 
             else:
-                await _handle_standard_event(update, session, parsed, text)
+                await _handle_standard_event(update, context, session, parsed, text)
 
     except Exception as e:
         logger.error(f"handle_message error: {e}", exc_info=True)
         await update.message.reply_text("😔 Что-то пошло не так. Попробуй ещё раз.")
 
 
-async def _handle_standard_event(update, session, parsed: ParsedMessage, raw_text: str):
+async def _handle_standard_event(
+    update,
+    context,
+    session,
+    parsed: ParsedMessage,
+    raw_text: str,
+):
     # Проверка цены для продаж
     if parsed.event_type == EventType.SALE:
         bottle_price = get_setting(session, "bottle_price")
@@ -182,6 +190,10 @@ async def _handle_standard_event(update, session, parsed: ParsedMessage, raw_tex
     for event in saved_events:
         _sync_event_to_sheets(event, bottle_price_val)
 
+    placement_events = [event for event in saved_events if event.event_type == "placement"]
+    if placement_events:
+        await _notify_customers_about_placement(context, session, placement_events)
+
 
 async def _handle_ingredient_purchase(update, session, parsed: ParsedMessage, raw_text: str):
     if not all([parsed.ingredient_name, parsed.ingredient_quantity,
@@ -220,7 +232,10 @@ async def _handle_ingredient_purchase(update, session, parsed: ParsedMessage, ra
         f"📊 Цена за {unit_label}: {price_per_unit:.4f} сом"
     )
     if old_price and abs(float(old_price) - price_per_unit) > 0.0001:
-        reply += f"\n⚠️ Цена изменилась: {float(old_price):.4f} → {price_per_unit:.4f} сом/{unit_label}"
+        reply += (
+            f"\n⚠️ Цена изменилась: {float(old_price):.4f} "
+            f"→ {price_per_unit:.4f} сом/{unit_label}"
+        )
 
     await update.message.reply_text(reply)
 
@@ -312,7 +327,6 @@ async def _handle_delete_selection(update, session, pending_json: str, text: str
     try:
         data = json.loads(pending_json)
         event_ids: list[int] = data["ids"]
-        labels: list[str] = data["labels"]
     except Exception:
         delete_setting(session, "pending_delete_ids")
         await update.message.reply_text("❌ Ошибка. Повтори команду /delete.")
@@ -357,6 +371,37 @@ def _sync_event_to_sheets(event, bottle_price: float):
             )
     except Exception as e:
         logger.warning(f"Sheets sync failed silently: {e}")
+
+
+async def _notify_customers_about_placement(context, session, placement_events) -> None:
+    customer_chat_ids = get_registered_customer_chat_ids(session)
+    if not customer_chat_ids:
+        return
+
+    from src.services.stock import get_floor_stock
+
+    stock = get_floor_stock(session)
+
+    lines = ["🍹 Свежий компот добавлен!"]
+    for event in placement_events:
+        floor = event.floor
+        qty = event.quantity or 0
+        if floor:
+            lines.append(f"🏢 {floor}-й этаж: добавлено {qty} бутылок")
+        else:
+            lines.append(f"🍾 Добавлено {qty} бутылок")
+
+    lines.append("\nСейчас осталось:")
+    for floor in (2, 3):
+        lines.append(f"🏢 {floor}-й этаж: {stock.get(floor, 0)} бутылок")
+
+    text = "\n".join(lines)
+
+    for chat_id in customer_chat_ids:
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=text)
+        except Exception as e:
+            logger.warning(f"Не удалось отправить уведомление клиенту {chat_id}: {e}")
 
 
 def _is_volume(text: str) -> bool:
@@ -409,7 +454,7 @@ async def _handle_pending_action(update, session, action: str, text: str):
 
 async def _handle_button(update: Update, context, text: str):
     from src.handlers.commands import (
-        cost_handler, month_handler, sheet_handler, week_handler,
+        cost_handler, sheet_handler,
     )
 
     if text == BTN_TODAY:

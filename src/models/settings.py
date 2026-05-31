@@ -37,3 +37,20 @@ def delete_setting(session, key: str) -> None:
     if s:
         session.delete(s)
         session.commit()
+
+
+def get_registered_customer_chat_ids(session) -> list[int]:
+    settings = (
+        session.query(UserSetting)
+        .filter(UserSetting.key.like("c_registered_%"))
+        .all()
+    )
+
+    chat_ids: list[int] = []
+    for setting in settings:
+        raw_chat_id = setting.key.removeprefix("c_registered_")
+        try:
+            chat_ids.append(int(raw_chat_id))
+        except ValueError:
+            continue
+    return chat_ids

@@ -1,4 +1,4 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 
 # ── Кнопки администратора ──────────────────────────────────────────────────
 BTN_TODAY = "📊 Сегодня"
@@ -31,19 +31,18 @@ ADMIN_BUTTONS = {BTN_TODAY, BTN_WEEK, BTN_MONTH, BTN_COST,
 ALL_BUTTONS = ADMIN_BUTTONS  # для обратной совместимости
 
 # ── Кнопки клиента ────────────────────────────────────────────────────────
-BTN_C_STOCK = "🍾 Сколько бутылок осталось?"
-BTN_C_BUY = "✅ Я купил компот"
+BTN_C_FLOOR_2 = "🏢 2 этаж"
+BTN_C_FLOOR_3 = "🏢 3 этаж"
 
 CUSTOMER_KEYBOARD = ReplyKeyboardMarkup(
     [
-        [BTN_C_STOCK],
-        [BTN_C_BUY],
+        [BTN_C_FLOOR_2, BTN_C_FLOOR_3],
     ],
     resize_keyboard=True,
     is_persistent=True,
 )
 
-CUSTOMER_BUTTONS = {BTN_C_STOCK, BTN_C_BUY}
+CUSTOMER_BUTTONS = {BTN_C_FLOOR_2, BTN_C_FLOOR_3}
 
 # ── Inline-кнопки выбора этажа ────────────────────────────────────────────
 FLOOR_KEYBOARD = InlineKeyboardMarkup([
