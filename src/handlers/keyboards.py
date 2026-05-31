@@ -51,3 +51,14 @@ FLOOR_KEYBOARD = InlineKeyboardMarkup([
         InlineKeyboardButton("🏢 3-й этаж", callback_data="floor:3"),
     ]
 ])
+
+
+def order_tomorrow_keyboard(floor: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [[
+            InlineKeyboardButton(
+                "📦 Заказать бутылку на завтра",
+                callback_data=f"order_tomorrow:{floor}",
+            )
+        ]]
+    )

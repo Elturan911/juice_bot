@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes
 
 from src.models.base import Session
 from src.models.batch import Batch
-from src.models.settings import get_setting, set_setting
+from src.models.settings import set_setting
 from src.services.analytics import (
     format_period_report,
     get_breakeven_analysis,
@@ -191,13 +191,23 @@ async def breakeven_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         if d["breakeven_bottles"] is not None:
             lines.append(f"🎯 Нужно продать: {d['breakeven_bottles']} бут/мес чтобы выйти в ноль")
             if d["bottles_to_go"] and d["bottles_to_go"] > 0:
-                daily_needed = d["bottles_to_go"] / d["days_left"] if d["days_left"] > 0 else d["bottles_to_go"]
-                lines.append(f"⏳ Осталось продать: {d['bottles_to_go']} бут за {d['days_left']} дней")
+                daily_needed = (
+                    d["bottles_to_go"] / d["days_left"]
+                    if d["days_left"] > 0
+                    else d["bottles_to_go"]
+                )
+                lines.append(
+                    f"⏳ Осталось продать: {d['bottles_to_go']} бут за "
+                    f"{d['days_left']} дней"
+                )
                 lines.append(f"   (~{daily_needed:.1f} бут/день)")
             else:
                 lines.append("✅ Точка безубыточности уже пройдена!")
 
-    lines.append(f"\n📊 Факт за {d['days_passed']} дн.: {d['sold']} бут ({d['daily_pace']:.1f} бут/день)")
+    lines.append(
+        f"\n📊 Факт за {d['days_passed']} дн.: {d['sold']} бут "
+        f"({d['daily_pace']:.1f} бут/день)"
+    )
     lines.append(f"🔮 Прогноз на месяц: {d['projected_month']} бут")
     lines.append(f"   Выручка: ~{d['projected_revenue']:,.0f} сом")
 
@@ -212,6 +222,32 @@ async def stock_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     with Session() as session:
         stock = get_floor_stock(session)
     await update.message.reply_text(format_stock_report(stock))
+
+
+async def tomorrow_orders_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from datetime import timedelta
+
+    from src.models.tomorrow_order import get_order_summary
+
+    target_date = date.today() + timedelta(days=1)
+    with Session() as session:
+        summary = get_order_summary(session, target_date)
+
+    if not summary:
+        await update.message.reply_text(
+            f"📭 Заказов на {target_date.strftime('%d.%m.%Y')} пока нет."
+        )
+        return
+
+    lines = [f"📦 Заказы на завтра — {target_date.strftime('%d.%m.%Y')}\n"]
+    total = 0
+    for floor in (2, 3):
+        count = summary.get(floor, 0)
+        lines.append(f"🏢 {floor}-й этаж: {count} бутылок")
+        total += count
+    lines.append(f"\nВсего приготовить под заказы: {total} бутылок")
+
+    await update.message.reply_text("\n".join(lines))
 
 
 async def setmarketprice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

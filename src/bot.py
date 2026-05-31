@@ -55,12 +55,14 @@ def main() -> None:
         sheet_handler,
         start_handler,
         stock_handler,
+        tomorrow_orders_handler,
         week_handler,
     )
     from src.handlers.customer import (
         handle_customer_message,
         handle_customer_photo,
         handle_floor_callback,
+        handle_order_tomorrow_callback,
     )
     from src.handlers.messages import handle_message, handle_voice
     from src.services.scheduler import DAILY_REPORT_TIME, daily_report_job
@@ -97,6 +99,7 @@ def main() -> None:
     app.add_handler(CommandHandler("delete", _admin_only(delete_handler)))
     app.add_handler(CommandHandler("stock", _admin_only(stock_handler)))
     app.add_handler(CommandHandler("breakeven", _admin_only(breakeven_handler)))
+    app.add_handler(CommandHandler("tomorrow", _admin_only(tomorrow_orders_handler)))
 
     # ── Текстовые сообщения: роутинг admin / customer ─────────────────────
     async def route_text(update, context):
@@ -134,6 +137,12 @@ def main() -> None:
 
     # ── Callback: выбор этажа клиентом ───────────────────────────────────
     app.add_handler(CallbackQueryHandler(handle_floor_callback, pattern=r"^floor:"))
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_order_tomorrow_callback,
+            pattern=r"^order_tomorrow:",
+        )
+    )
 
     # ── Ежедневный отчёт в 22:00 Бишкек ─────────────────────────────────
     app.job_queue.run_daily(daily_report_job, time=DAILY_REPORT_TIME)
