@@ -1,4 +1,5 @@
 """Обработчики для клиентов (не-администраторов)."""
+
 import logging
 import os
 from datetime import date, timedelta
@@ -14,7 +15,7 @@ from src.handlers.keyboards import (
 )
 from src.models.base import Session
 from src.models.tomorrow_order import create_tomorrow_order, get_order_summary
-from src.services.stock import get_floor_stock
+from src.services.stock import format_floor_product_stock, get_floor_product_stock, get_floor_total
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +59,8 @@ async def handle_floor_callback(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     with Session() as session:
-        stock = get_floor_stock(session)
-    remaining = stock.get(floor, 0)
+        stock = get_floor_product_stock(session)
+    remaining = get_floor_total(stock, floor)
 
     if remaining <= 0:
         await query.edit_message_text(
@@ -69,7 +70,7 @@ async def handle_floor_callback(update: Update, context: ContextTypes.DEFAULT_TY
         )
         return
 
-    await query.edit_message_text(f"🍾 На {floor}-м этаже сейчас примерно {remaining} бутылок.")
+    await query.edit_message_text(format_floor_product_stock(stock, floor))
 
 
 async def handle_order_tomorrow_callback(
@@ -103,8 +104,8 @@ async def handle_order_tomorrow_callback(
 
 async def _send_floor_stock(update: Update, floor: int) -> None:
     with Session() as session:
-        stock = get_floor_stock(session)
-    remaining = stock.get(floor, 0)
+        stock = get_floor_product_stock(session)
+    remaining = get_floor_total(stock, floor)
 
     if remaining <= 0:
         await update.message.reply_text(
@@ -115,7 +116,7 @@ async def _send_floor_stock(update: Update, floor: int) -> None:
         return
 
     await update.message.reply_text(
-        f"🍾 На {floor}-м этаже сейчас примерно {remaining} бутылок.",
+        format_floor_product_stock(stock, floor),
         reply_markup=CUSTOMER_KEYBOARD,
     )
 

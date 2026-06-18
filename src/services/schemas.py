@@ -1,4 +1,5 @@
 """Pydantic-схемы для LLM-вывода — без зависимости от anthropic."""
+
 from datetime import date
 from enum import Enum
 from typing import Literal, Optional
@@ -33,6 +34,7 @@ class ParsedMessage(BaseModel):
     floor: Optional[int] = None
     quantity: Optional[int] = None
     bottle_volume_ml: Optional[int] = None
+    product_name: Optional[str] = None
     amount_som: Optional[float] = None
     description: Optional[str] = None
     event_date: Optional[date] = None

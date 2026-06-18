@@ -15,6 +15,7 @@ class Event(Base):
     floor: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     quantity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     bottle_volume_ml: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    product_name: Mapped[str] = mapped_column(String(100), nullable=False, server_default="компот")
     amount_som: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
@@ -26,14 +27,31 @@ class Event(Base):
     __table_args__ = (Index("ix_events_event_date", "event_date"),)
 
 
-def save_events(session, event_type: str, floor, quantity, bottle_volume_ml,
-                amount_som, description, raw_text: str, event_date) -> list[Event]:
+def save_events(
+    session,
+    event_type: str,
+    floor,
+    quantity,
+    bottle_volume_ml,
+    amount_som,
+    description,
+    raw_text: str,
+    event_date,
+    product_name: str | None = None,
+) -> list[Event]:
     from datetime import date as date_cls
+
     target_date = event_date or date_cls.today()
     event = Event(
-        event_type=event_type, floor=floor, quantity=quantity,
-        bottle_volume_ml=bottle_volume_ml, amount_som=amount_som,
-        description=description, raw_text=raw_text, event_date=target_date,
+        event_type=event_type,
+        floor=floor,
+        quantity=quantity,
+        bottle_volume_ml=bottle_volume_ml,
+        product_name=product_name or "компот",
+        amount_som=amount_som,
+        description=description,
+        raw_text=raw_text,
+        event_date=target_date,
     )
     session.add(event)
     session.commit()

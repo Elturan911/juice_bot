@@ -36,6 +36,7 @@ EVENT_TYPE_RU = {
 
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     from src.handlers.keyboards import MAIN_KEYBOARD
+
     with Session() as session:
         set_setting(session, "chat_id", str(update.effective_chat.id))
     await update.message.reply_text(
@@ -139,6 +140,7 @@ async def month_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         prev = get_prev_month_analytics(session, year, month)
 
     import calendar
+
     month_name = calendar.month_name[month]
     label = f"{month_name} {year}"
     await update.message.reply_text(format_period_report(analytics, label, prev or None))
@@ -146,17 +148,15 @@ async def month_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def cost_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     from sqlalchemy import select
+
     with Session() as session:
-        batch = session.scalars(
-            select(Batch).order_by(Batch.created_at.desc()).limit(1)
-        ).first()
+        batch = session.scalars(select(Batch).order_by(Batch.created_at.desc()).limit(1)).first()
 
     if not batch:
         await update.message.reply_text("📭 Нет данных о партиях. Запиши расход ингредиентов.")
         return
 
-    margin = (float(batch.recommended_price_som or 0) -
-              float(batch.cost_per_bottle_som or 0))
+    margin = float(batch.recommended_price_som or 0) - float(batch.cost_per_bottle_som or 0)
     cost = float(batch.cost_per_bottle_som or 0)
     pct = (margin / cost * 100) if cost > 0 else 0
 
@@ -197,16 +197,14 @@ async def breakeven_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     else d["bottles_to_go"]
                 )
                 lines.append(
-                    f"⏳ Осталось продать: {d['bottles_to_go']} бут за "
-                    f"{d['days_left']} дней"
+                    f"⏳ Осталось продать: {d['bottles_to_go']} бут за " f"{d['days_left']} дней"
                 )
                 lines.append(f"   (~{daily_needed:.1f} бут/день)")
             else:
                 lines.append("✅ Точка безубыточности уже пройдена!")
 
     lines.append(
-        f"\n📊 Факт за {d['days_passed']} дн.: {d['sold']} бут "
-        f"({d['daily_pace']:.1f} бут/день)"
+        f"\n📊 Факт за {d['days_passed']} дн.: {d['sold']} бут " f"({d['daily_pace']:.1f} бут/день)"
     )
     lines.append(f"🔮 Прогноз на месяц: {d['projected_month']} бут")
     lines.append(f"   Выручка: ~{d['projected_revenue']:,.0f} сом")
@@ -218,10 +216,11 @@ async def breakeven_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def stock_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from src.services.stock import format_stock_report, get_floor_stock
+    from src.services.stock import format_product_stock_report, get_floor_product_stock
+
     with Session() as session:
-        stock = get_floor_stock(session)
-    await update.message.reply_text(format_stock_report(stock))
+        stock = get_floor_product_stock(session)
+    await update.message.reply_text(format_product_stock_report(stock))
 
 
 async def tomorrow_orders_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -255,6 +254,7 @@ async def setmarketprice_handler(update: Update, context: ContextTypes.DEFAULT_T
     if not args:
         with Session() as session:
             from src.services.market_price import get_or_fetch_market_price
+
             current = get_or_fetch_market_price(session)
         await update.message.reply_text(
             f"📊 Текущая рыночная цена: {current:,.0f} сом/бутылка\n"
@@ -271,6 +271,7 @@ async def setmarketprice_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     with Session() as session:
         from src.services.market_price import set_market_price
+
         set_market_price(session, price)
 
     await update.message.reply_text(
@@ -294,8 +295,7 @@ async def delete_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if not args:
         await update.message.reply_text(
-            "❌ Укажи дату: /delete 2026-05-04\n"
-            "Или все записи за дату: /delete all 2026-05-04"
+            "❌ Укажи дату: /delete 2026-05-04\n" "Или все записи за дату: /delete all 2026-05-04"
         )
         return
 
@@ -315,9 +315,7 @@ async def delete_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         events = get_events_for_date(session, target)
 
         if not events:
-            await update.message.reply_text(
-                f"📭 За {target.strftime('%d.%m.%Y')} нет записей."
-            )
+            await update.message.reply_text(f"📭 За {target.strftime('%d.%m.%Y')} нет записей.")
             return
 
         if delete_all:

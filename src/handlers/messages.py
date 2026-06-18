@@ -21,7 +21,6 @@ from src.handlers.keyboards import (
     BTN_WEEK,
     MAIN_KEYBOARD,
 )
-
 from src.models.base import Session
 from src.models.batch import save_batch
 from src.models.batch_usage import BatchIngredientUsage
@@ -38,10 +37,7 @@ from src.services.cost_calculator import calculate_batch_cost, calculate_recomme
 from src.services.market_price import get_or_fetch_market_price
 from src.services.parser import parse_message
 from src.services.schemas import EventType, ParsedMessage
-from src.services.sheets import (
-    append_to_expenses,
-    append_to_revenue,
-)
+from src.services.sheets import append_to_expenses, append_to_revenue
 from src.services.unit_converter import convert_to_base_unit, get_base_unit
 
 logger = logging.getLogger(__name__)
@@ -138,9 +134,7 @@ async def _handle_standard_event(
     if parsed.event_type == EventType.SALE:
         bottle_price = get_setting(session, "bottle_price")
         if not bottle_price:
-            await update.message.reply_text(
-                "⚠️ Сначала установи цену бутылки:\n/setprice 100"
-            )
+            await update.message.reply_text("⚠️ Сначала установи цену бутылки:\n/setprice 100")
             return
 
     # Сохранение всех событий (включая additional_events)
@@ -160,6 +154,7 @@ async def _handle_standard_event(
             description=p.description,
             raw_text=raw_text,
             event_date=p.event_date,
+            product_name=p.product_name,
         )
         saved_events.extend(events)
 
@@ -170,6 +165,8 @@ async def _handle_standard_event(
     for event in saved_events:
         label = EVENT_TYPE_LABELS.get(event.event_type, event.event_type)
         line = f"\n{label}"
+        if event.product_name:
+            line += f"\n🥤 Продукт: {event.product_name}"
         if event.floor:
             line += f"\n🏢 Этаж: {event.floor}"
         if event.quantity:
@@ -196,11 +193,16 @@ async def _handle_standard_event(
 
 
 async def _handle_ingredient_purchase(update, session, parsed: ParsedMessage, raw_text: str):
-    if not all([parsed.ingredient_name, parsed.ingredient_quantity,
-                parsed.ingredient_unit, parsed.ingredient_total_price_som]):
+    if not all(
+        [
+            parsed.ingredient_name,
+            parsed.ingredient_quantity,
+            parsed.ingredient_unit,
+            parsed.ingredient_total_price_som,
+        ]
+    ):
         await update.message.reply_text(
-            "❓ Укажи название, количество и цену.\n"
-            "Пример: «купил сахар 2 кг за 200 сом»"
+            "❓ Укажи название, количество и цену.\n" "Пример: «купил сахар 2 кг за 200 сом»"
         )
         return
 
@@ -241,7 +243,8 @@ async def _handle_ingredient_purchase(update, session, parsed: ParsedMessage, ra
 
     # Расходы в Sheets
     append_to_expenses(
-        date.today(), "ingredient_purchase",
+        date.today(),
+        "ingredient_purchase",
         f"{parsed.ingredient_name} {parsed.ingredient_quantity}{parsed.ingredient_unit}",
         parsed.ingredient_total_price_som,
     )
@@ -366,8 +369,10 @@ def _sync_event_to_sheets(event, bottle_price: float):
             append_to_revenue(event.event_date, event.floor, event.quantity, revenue)
         elif event.event_type in ("production_expense",):
             append_to_expenses(
-                event.event_date, event.event_type,
-                event.description or "", float(event.amount_som or 0)
+                event.event_date,
+                event.event_type,
+                event.description or "",
+                float(event.amount_som or 0),
             )
     except Exception as e:
         logger.warning(f"Sheets sync failed silently: {e}")
@@ -378,22 +383,28 @@ async def _notify_customers_about_placement(context, session, placement_events) 
     if not customer_chat_ids:
         return
 
-    from src.services.stock import get_floor_stock
+    from src.services.stock import get_floor_product_stock
 
-    stock = get_floor_stock(session)
+    stock = get_floor_product_stock(session)
 
     lines = ["🍹 Свежий компот добавлен!"]
     for event in placement_events:
         floor = event.floor
         qty = event.quantity or 0
+        product = event.product_name or "компот"
         if floor:
-            lines.append(f"🏢 {floor}-й этаж: добавлено {qty} бутылок")
+            lines.append(f"🏢 {floor}-й этаж: добавлено {product} — {qty} шт")
         else:
-            lines.append(f"🍾 Добавлено {qty} бутылок")
+            lines.append(f"🍾 Добавлено {product} — {qty} шт")
 
     lines.append("\nСейчас осталось:")
     for floor in (2, 3):
-        lines.append(f"🏢 {floor}-й этаж: {stock.get(floor, 0)} бутылок")
+        products = stock.get(floor, {})
+        if products:
+            parts = ", ".join(f"{product}: {count} шт" for product, count in products.items())
+            lines.append(f"🏢 {floor}-й этаж: {parts}")
+        else:
+            lines.append(f"🏢 {floor}-й этаж: 0 бутылок")
 
     text = "\n".join(lines)
 
@@ -445,6 +456,7 @@ async def _handle_pending_action(update, session, action: str, text: str):
         )
     elif action == "setmarketprice":
         from src.services.market_price import set_market_price
+
         set_market_price(session, value)
         await update.message.reply_text(
             f"✅ Рыночная цена: {value:,.0f} сом/бутылка",
@@ -453,16 +465,18 @@ async def _handle_pending_action(update, session, action: str, text: str):
 
 
 async def _handle_button(update: Update, context, text: str):
-    from src.handlers.commands import (
-        cost_handler, sheet_handler,
-    )
+    from src.handlers.commands import cost_handler, sheet_handler
 
     if text == BTN_TODAY:
+        import calendar
+
         from src.models.base import Session as Sess
         from src.services.analytics import (
-            format_period_report, get_day_analytics, get_prev_day_analytics,
+            format_period_report,
+            get_day_analytics,
+            get_prev_day_analytics,
         )
-        import calendar
+
         d = date.today()
         with Sess() as session:
             analytics = get_day_analytics(session, d)
@@ -476,8 +490,11 @@ async def _handle_button(update: Update, context, text: str):
     elif text == BTN_WEEK:
         from src.models.base import Session as Sess
         from src.services.analytics import (
-            format_period_report, get_week_analytics, get_prev_week_analytics,
+            format_period_report,
+            get_prev_week_analytics,
+            get_week_analytics,
         )
+
         with Sess() as session:
             analytics = get_week_analytics(session, date.today())
             prev = get_prev_week_analytics(session, date.today())
@@ -492,11 +509,15 @@ async def _handle_button(update: Update, context, text: str):
         )
 
     elif text == BTN_MONTH:
+        import calendar
+
         from src.models.base import Session as Sess
         from src.services.analytics import (
-            format_period_report, get_month_analytics, get_prev_month_analytics,
+            format_period_report,
+            get_month_analytics,
+            get_prev_month_analytics,
         )
-        import calendar
+
         d = date.today()
         with Sess() as session:
             analytics = get_month_analytics(session, d.year, d.month)
@@ -508,15 +529,17 @@ async def _handle_button(update: Update, context, text: str):
         )
 
     elif text == BTN_STOCK:
-        from src.services.stock import format_stock_report, get_floor_stock
+        from src.services.stock import format_product_stock_report, get_floor_product_stock
+
         with Session() as session:
-            stock = get_floor_stock(session)
+            stock = get_floor_product_stock(session)
         await update.message.reply_text(
-            format_stock_report(stock), reply_markup=MAIN_KEYBOARD
+            format_product_stock_report(stock), reply_markup=MAIN_KEYBOARD
         )
 
     elif text == BTN_BREAKEVEN:
         from src.handlers.commands import breakeven_handler
+
         await breakeven_handler(update, context)
 
     elif text == BTN_COST:
@@ -538,6 +561,7 @@ async def _handle_button(update: Update, context, text: str):
     elif text == BTN_MARKET_PRICE:
         with Session() as session:
             from src.services.market_price import get_or_fetch_market_price
+
             current = get_or_fetch_market_price(session)
             set_setting(session, "pending_action", "setmarketprice")
         await update.message.reply_text(
@@ -565,6 +589,7 @@ async def _handle_button(update: Update, context, text: str):
 async def transcribe_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str | None:
     """Скачивает голосовое сообщение и транскрибирует через Groq Whisper."""
     from groq import Groq
+
     try:
         voice = update.message.voice or update.message.audio
         tg_file = await context.bot.get_file(voice.file_id)
